@@ -376,7 +376,8 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ (/) 斜線指令註冊成功！');
+        console.log(`✅ (/) 斜線指令註冊成功！共註冊了 ${commands.length} 個指令。`);
+        console.log('註冊清單:', commands.map(c => c.name).join(', '));
     } catch (error) {
         console.error('❌ 註冊斜線指令錯誤:', error);
     }
@@ -431,9 +432,13 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.commandName === '水木女王聖旨') {
-        return await executeDecree(interaction);
-    }
+    // 記錄指令互動日誌
+    console.log(`[Interaction] ${interaction.user.tag} 使用了指令: /${interaction.commandName}`);
+
+    try {
+        if (interaction.commandName === decreeCommand.name) {
+            return await executeDecree(interaction);
+        }
 
     if (interaction.commandName === 'peak') {
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
@@ -639,7 +644,27 @@ client.on('interactionCreate', async interaction => {
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
         await interaction.reply({ content: `✅ 成功！已設定任務提醒頻道為: **${channel.name}**。`, ephemeral: true });
+        } else {
+            console.warn(`[Interaction] 未知的指令: /${interaction.commandName}`);
+            await interaction.reply({ content: `❌ 未知指令: \`${interaction.commandName}\``, ephemeral: true });
+        }
+    } catch (error) {
+        console.error(`❌ 處理指令 [${interaction.commandName}] 時發生錯誤:`, error);
+        if (interaction.deferred || interaction.replied) {
+            await interaction.followUp({ content: '抱歉，處理指令時發生錯誤！', ephemeral: true });
+        } else {
+            await interaction.reply({ content: '抱歉，處理指令時發生錯誤！', ephemeral: true });
+        }
     }
+});
+
+// 全域錯誤處理
+process.on('unhandledRejection', error => {
+    console.error('❌ 未處理的 Promise 拒絕:', error);
+});
+
+client.on('error', error => {
+    console.error('❌ Discord 客戶端錯誤:', error);
 });
 
 client.login(process.env.DISCORD_TOKEN);
