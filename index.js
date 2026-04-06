@@ -3,6 +3,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, REST, Routes, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { decreeCommand, executeDecree } = require('./decree.js');
 
 // 初始化機器人客戶端
 const client = new Client({
@@ -29,7 +30,7 @@ if (!fs.existsSync(dataPath)) {
 const commands = [
     {
         name: 'peak',
-        description: '查看本伺服器的最高同時在線人數紀錄 (每小時更新一次)'
+        description: '查看本伺服器的最高同時在線人數紀錄 (每 30 分鐘更新一次)'
     },
     {
         name: 'setchannel',
@@ -59,7 +60,7 @@ const commands = [
     },
     {
         name: 'online',
-        description: '查看目前的在線人數 (每小時更新一次)'
+        description: '查看目前的在線人數 (每 30 分鐘更新一次)'
     },
     {
         name: 'setbirthday',
@@ -138,7 +139,7 @@ const commands = [
     },
     {
         name: 'set_reminder',
-        description: '設定每日任務提醒 (每小時檢查一次，管理員專用)',
+        description: '設定每日任務提醒 (每 30 分鐘檢查一次，管理員專用)',
         options: [
             {
                 name: 'user',
@@ -192,7 +193,8 @@ const commands = [
                 required: true
             }
         ]
-    }
+    },
+    decreeCommand // 新增的水木女王聖旨指令
 ];
 
 // ==========================================
@@ -382,15 +384,15 @@ client.once('ready', async () => {
     // 2. 啟動定時任務 (優先啟動)
     console.log('🚀 正在啟動定時任務系統...');
     
-    // 生日檢查：立即執行一次，之後每 12 小時檢查一次
+    // 生日檢查：立即執行一次，之後每 6 小時檢查一次
     checkBirthdays();
-    setInterval(checkBirthdays, 12 * 60 * 60 * 1000); 
+    setInterval(checkBirthdays, 6 * 60 * 60 * 1000); 
 
-    // 任務提醒：立即執行一次，之後每 1 小時檢查一次
+    // 任務提醒：立即執行一次，之後每 30 分鐘檢查一次
     checkReminders();
-    setInterval(checkReminders, 1 * 60 * 60 * 1000); 
+    setInterval(checkReminders, 30 * 60 * 1000); 
 
-    // 3. 在線人數掃描：立即掃描一次，之後每 1 小時更新一次
+    // 3. 在線人數掃描：立即掃描一次，之後每 30 分鐘更新一次
     const scanGuilds = async () => {
         console.log('🔍 正在執行在線人數掃描與更新...');
         for (const [id, guild] of client.guilds.cache) {
@@ -407,7 +409,7 @@ client.once('ready', async () => {
     };
     
     scanGuilds(); 
-    setInterval(scanGuilds, 60 * 60 * 1000); // 設定為每小時更新一次
+    setInterval(scanGuilds, 30 * 60 * 1000); // 設定為每 30 分鐘更新一次
 });
 
 // ==========================================
@@ -428,6 +430,10 @@ client.on('presenceUpdate', async (oldPresence, newPresence) => {
 // ==========================================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName === '水木女王聖旨') {
+        return await executeDecree(interaction);
+    }
 
     if (interaction.commandName === 'peak') {
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
